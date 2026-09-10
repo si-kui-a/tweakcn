@@ -1,7 +1,6 @@
 import { ThemeEditorState } from "@/types/editor";
 import { colorFormatter } from "./color-converter";
 import { ColorFormat } from "../types";
-import { getShadowMap } from "./shadows";
 import { defaultLightThemeStyles } from "@/config/theme";
 import { ThemeStyles } from "@/types/theme";
 import { extractFontFamily } from "./fonts";
@@ -57,18 +56,6 @@ const generateFontVariables = (themeStyles: ThemeStyles, mode: ThemeMode): strin
   --font-mono: ${styles["font-mono"]};`;
 };
 
-const generateShadowVariables = (shadowMap: Record<string, string>): string => {
-  return `
-  --shadow-2xs: ${shadowMap["shadow-2xs"]};
-  --shadow-xs: ${shadowMap["shadow-xs"]};
-  --shadow-sm: ${shadowMap["shadow-sm"]};
-  --shadow: ${shadowMap["shadow"]};
-  --shadow-md: ${shadowMap["shadow-md"]};
-  --shadow-lg: ${shadowMap["shadow-lg"]};
-  --shadow-xl: ${shadowMap["shadow-xl"]};
-  --shadow-2xl: ${shadowMap["shadow-2xl"]};`;
-};
-
 const generateRawShadowVariables = (themeStyles: ThemeStyles, mode: ThemeMode): string => {
   const styles = themeStyles[mode];
   return `
@@ -104,9 +91,6 @@ const generateThemeVariables = (
   const colorVars = generateColorVariables(themeStyles, mode, formatColor);
   const fontVars = generateFontVariables(themeStyles, mode);
   const radiusVar = `\n  --radius: ${themeStyles[mode].radius};`;
-  const shadowVars = generateShadowVariables(
-    getShadowMap({ styles: themeStyles, currentMode: mode })
-  );
   const rawShadowVars = generateRawShadowVariables(themeStyles, mode);
   const spacingVar =
     mode === "light"
@@ -125,12 +109,80 @@ const generateThemeVariables = (
     fontVars +
     radiusVar +
     rawShadowVars +
-    shadowVars +
     trackingVars +
     spacingVar +
     "\n}"
   );
 };
+
+// Kept in sync with the identical @utility rules in app/globals.css -- see
+// the comment there for why box-shadow is composed by hand here instead of
+// letting `@theme inline` generate it (fix for #124).
+const SHADOW_UTILITIES = `@utility shadow-2xs {
+  --tw-shadow: var(--shadow-x) var(--shadow-y) var(--shadow-blur) var(--shadow-spread)
+    var(--tw-shadow-color, hsl(from var(--shadow-color) h s l / calc(var(--shadow-opacity) * 0.5)));
+  box-shadow: var(--tw-inset-shadow), var(--tw-inset-ring-shadow), var(--tw-ring-offset-shadow),
+    var(--tw-ring-shadow), var(--tw-shadow);
+}
+
+@utility shadow-xs {
+  --tw-shadow: var(--shadow-x) var(--shadow-y) var(--shadow-blur) var(--shadow-spread)
+    var(--tw-shadow-color, hsl(from var(--shadow-color) h s l / calc(var(--shadow-opacity) * 0.5)));
+  box-shadow: var(--tw-inset-shadow), var(--tw-inset-ring-shadow), var(--tw-ring-offset-shadow),
+    var(--tw-ring-shadow), var(--tw-shadow);
+}
+
+@utility shadow-sm {
+  --tw-shadow: var(--shadow-x) var(--shadow-y) var(--shadow-blur) var(--shadow-spread)
+      var(--tw-shadow-color, hsl(from var(--shadow-color) h s l / calc(var(--shadow-opacity) * 1))),
+    var(--shadow-x) 1px 2px calc(var(--shadow-spread) - 1px)
+      var(--tw-shadow-color, hsl(from var(--shadow-color) h s l / calc(var(--shadow-opacity) * 1)));
+  box-shadow: var(--tw-inset-shadow), var(--tw-inset-ring-shadow), var(--tw-ring-offset-shadow),
+    var(--tw-ring-shadow), var(--tw-shadow);
+}
+
+@utility shadow {
+  --tw-shadow: var(--shadow-x) var(--shadow-y) var(--shadow-blur) var(--shadow-spread)
+      var(--tw-shadow-color, hsl(from var(--shadow-color) h s l / calc(var(--shadow-opacity) * 1))),
+    var(--shadow-x) 1px 2px calc(var(--shadow-spread) - 1px)
+      var(--tw-shadow-color, hsl(from var(--shadow-color) h s l / calc(var(--shadow-opacity) * 1)));
+  box-shadow: var(--tw-inset-shadow), var(--tw-inset-ring-shadow), var(--tw-ring-offset-shadow),
+    var(--tw-ring-shadow), var(--tw-shadow);
+}
+
+@utility shadow-md {
+  --tw-shadow: var(--shadow-x) var(--shadow-y) var(--shadow-blur) var(--shadow-spread)
+      var(--tw-shadow-color, hsl(from var(--shadow-color) h s l / calc(var(--shadow-opacity) * 1))),
+    var(--shadow-x) 2px 4px calc(var(--shadow-spread) - 1px)
+      var(--tw-shadow-color, hsl(from var(--shadow-color) h s l / calc(var(--shadow-opacity) * 1)));
+  box-shadow: var(--tw-inset-shadow), var(--tw-inset-ring-shadow), var(--tw-ring-offset-shadow),
+    var(--tw-ring-shadow), var(--tw-shadow);
+}
+
+@utility shadow-lg {
+  --tw-shadow: var(--shadow-x) var(--shadow-y) var(--shadow-blur) var(--shadow-spread)
+      var(--tw-shadow-color, hsl(from var(--shadow-color) h s l / calc(var(--shadow-opacity) * 1))),
+    var(--shadow-x) 4px 6px calc(var(--shadow-spread) - 1px)
+      var(--tw-shadow-color, hsl(from var(--shadow-color) h s l / calc(var(--shadow-opacity) * 1)));
+  box-shadow: var(--tw-inset-shadow), var(--tw-inset-ring-shadow), var(--tw-ring-offset-shadow),
+    var(--tw-ring-shadow), var(--tw-shadow);
+}
+
+@utility shadow-xl {
+  --tw-shadow: var(--shadow-x) var(--shadow-y) var(--shadow-blur) var(--shadow-spread)
+      var(--tw-shadow-color, hsl(from var(--shadow-color) h s l / calc(var(--shadow-opacity) * 1))),
+    var(--shadow-x) 8px 10px calc(var(--shadow-spread) - 1px)
+      var(--tw-shadow-color, hsl(from var(--shadow-color) h s l / calc(var(--shadow-opacity) * 1)));
+  box-shadow: var(--tw-inset-shadow), var(--tw-inset-ring-shadow), var(--tw-ring-offset-shadow),
+    var(--tw-ring-shadow), var(--tw-shadow);
+}
+
+@utility shadow-2xl {
+  --tw-shadow: var(--shadow-x) var(--shadow-y) var(--shadow-blur) var(--shadow-spread)
+    var(--tw-shadow-color, hsl(from var(--shadow-color) h s l / calc(var(--shadow-opacity) * 2.5)));
+  box-shadow: var(--tw-inset-shadow), var(--tw-inset-ring-shadow), var(--tw-ring-offset-shadow),
+    var(--tw-ring-shadow), var(--tw-shadow);
+}`;
 
 const generateTailwindV4ThemeInline = (themeStyles: ThemeStyles): string => {
   return `@theme inline {
@@ -176,15 +228,32 @@ const generateTailwindV4ThemeInline = (themeStyles: ThemeStyles): string => {
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
 
-  --shadow-2xs: var(--shadow-2xs);
-  --shadow-xs: var(--shadow-xs);
-  --shadow-sm: var(--shadow-sm);
-  --shadow: var(--shadow);
-  --shadow-md: var(--shadow-md);
-  --shadow-lg: var(--shadow-lg);
-  --shadow-xl: var(--shadow-xl);
-  --shadow-2xl: var(--shadow-2xl);${generateTrackingVariables(themeStyles)}
-}`;
+  /* Shadow utilities are handled by the hand-written @utility rules below
+     instead (see the comment above them), so unset Tailwind's own built-in
+     shadow-* theme keys here -- otherwise Tailwind would still generate its
+     default (non-themeable) shadow-md etc utilities alongside ours, and
+     those would win. */
+  --shadow-2xs: initial;
+  --shadow-xs: initial;
+  --shadow-sm: initial;
+  --shadow: initial;
+  --shadow-md: initial;
+  --shadow-lg: initial;
+  --shadow-xl: initial;
+  --shadow-2xl: initial;${generateTrackingVariables(themeStyles)}
+}
+
+/*
+ * A shadow-{color} utility (e.g. shadow-blue-500) only sets --tw-shadow-color;
+ * it relies on the shadow-md/lg/etc utility itself referencing
+ * var(--tw-shadow-color, <fallback>) to have any effect. Tailwind can only
+ * generate that reference when it knows the shadow's color at build time --
+ * ours is user-configurable at runtime (--shadow-color/--shadow-opacity
+ * above), so it can't. These rules do the same composition by hand, with
+ * the var(--tw-shadow-color, ...) fallback written directly into the rule
+ * that targets the element, so shadow-{color} keeps working.
+ */
+${SHADOW_UTILITIES}`;
 };
 
 const generateTailwindV3Config = (
