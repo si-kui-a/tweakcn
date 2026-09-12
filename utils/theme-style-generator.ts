@@ -4,6 +4,7 @@ import { ColorFormat } from "../types";
 import { defaultLightThemeStyles } from "@/config/theme";
 import { ThemeStyles } from "@/types/theme";
 import { extractFontFamily } from "./fonts";
+import { getShadowMap } from "./shadows";
 
 type ThemeMode = "light" | "dark";
 
@@ -67,6 +68,29 @@ const generateRawShadowVariables = (themeStyles: ThemeStyles, mode: ThemeMode): 
   --shadow-color: ${styles["shadow-color"]};`;
 };
 
+// Tailwind v3 has no `@utility` mechanism (see generateTailwindV4ThemeInline's
+// comment for why v4 composes shadow-md etc by hand instead of baking a
+// color into an inherited custom property), so its exported CSS still needs
+// a literal, fully-composed box-shadow value per size -- the same shape
+// `getShadowMap` already produces for the shadcn/v0 registry exporters.
+// v3-only: v4's shadow-{color} override only works because v4 never
+// declares these as a pre-composed inherited property in the first place.
+const generateComposedShadowVariables = (themeStyles: ThemeStyles, mode: ThemeMode): string => {
+  const shadowMap = getShadowMap({
+    styles: themeStyles,
+    currentMode: mode,
+  } as ThemeEditorState);
+  return `
+  --shadow-2xs: ${shadowMap["shadow-2xs"]};
+  --shadow-xs: ${shadowMap["shadow-xs"]};
+  --shadow-sm: ${shadowMap["shadow-sm"]};
+  --shadow: ${shadowMap["shadow"]};
+  --shadow-md: ${shadowMap["shadow-md"]};
+  --shadow-lg: ${shadowMap["shadow-lg"]};
+  --shadow-xl: ${shadowMap["shadow-xl"]};
+  --shadow-2xl: ${shadowMap["shadow-2xl"]};`;
+};
+
 const generateTrackingVariables = (themeStyles: ThemeStyles): string => {
   const styles = themeStyles["light"];
   if (styles["letter-spacing"] === "0em") {
@@ -85,13 +109,19 @@ const generateTrackingVariables = (themeStyles: ThemeStyles): string => {
 const generateThemeVariables = (
   themeStyles: ThemeStyles,
   mode: ThemeMode,
-  formatColor: (color: string) => string
+  formatColor: (color: string) => string,
+  includeComposedShadowVars: boolean
 ): string => {
   const selector = mode === "dark" ? ".dark" : ":root";
   const colorVars = generateColorVariables(themeStyles, mode, formatColor);
   const fontVars = generateFontVariables(themeStyles, mode);
   const radiusVar = `\n  --radius: ${themeStyles[mode].radius};`;
   const rawShadowVars = generateRawShadowVariables(themeStyles, mode);
+  // Only Tailwind v3's export needs the fully-composed variables -- see the
+  // comment on generateComposedShadowVariables for why.
+  const composedShadowVars = includeComposedShadowVars
+    ? generateComposedShadowVariables(themeStyles, mode)
+    : "";
   const spacingVar =
     mode === "light"
       ? `\n  --spacing: ${themeStyles["light"].spacing ?? defaultLightThemeStyles.spacing};`
@@ -109,6 +139,7 @@ const generateThemeVariables = (
     fontVars +
     radiusVar +
     rawShadowVars +
+    composedShadowVars +
     trackingVars +
     spacingVar +
     "\n}"
@@ -359,8 +390,19 @@ export const generateThemeCode = (
   const themeStyles = themeEditorState.styles as ThemeStyles;
   const formatColor = (color: string) => colorFormatter(color, colorFormat, tailwindVersion);
 
-  const lightTheme = generateThemeVariables(themeStyles, "light", formatColor);
-  const darkTheme = generateThemeVariables(themeStyles, "dark", formatColor);
+  const includeComposedShadowVars = tailwindVersion !== "4";
+  const lightTheme = generateThemeVariables(
+    themeStyles,
+    "light",
+    formatColor,
+    includeComposedShadowVars
+  );
+  const darkTheme = generateThemeVariables(
+    themeStyles,
+    "dark",
+    formatColor,
+    includeComposedShadowVars
+  );
 
   if (tailwindVersion === "4") {
     const tailwindV4Theme = generateTailwindV4ThemeInline(themeStyles);
